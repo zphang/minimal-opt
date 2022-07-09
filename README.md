@@ -1,7 +1,7 @@
 # Minimal OPT
 
 This is a minimal PyTorch implementation of [OPT models](https://arxiv.org/abs/2205.01068).
-It is based heavily on the [Hugging Face implementation of OPT models](https://github.com/huggingface/transformers/blob/main/src/transformers/models/opt/modeling_opt.py).
+It is based heavily on the [Hugging Face implementation of OPT models](https://github.com/huggingface/transformers/blob/main/src/transformers/models/opt/modeling_opt.py) as well as [Minimal GPT-NeoX-20B](https://github.com/zphang/minimal-gpt-neox-20b).
 
 The code currently includes both a single-GPU as well as a simple pipeline-parallel implementation.
 This means that in theory you should be able to run up to the 175B models on something like an 8xA100.
