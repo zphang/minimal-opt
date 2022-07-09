@@ -103,3 +103,8 @@ with torch.inference_mode():
 - Writing a minimal implementation is good exercise for understanding the internals of a model.
 - A minimal implementation is easy to hack around and modify.
 - A minimal implementation is also easy to inspect and use as a reference for downstream ports.
+
+## Other notes:
+
+- 350M not currently supported because it apparently [has some architectural differences](https://github.com/huggingface/transformers/blob/8b332a6a160c6df82e4267aaf118d87377d78a67/src/transformers/models/opt/modeling_opt.py#L328-L330).
+- I need to clean up the way masking works.
