@@ -27,6 +27,16 @@ OPT_125M_CONFIG = OPTConfig(
     num_hidden_layers=12,
 )
 
+OPT_1_3B_CONFIG = OPTConfig(
+    vocab_size=50272,
+    hidden_size=2048,
+    max_position_embeddings=2050,
+    num_attention_heads=32,
+    head_dim=64,
+    ffn_dim=8192,
+    num_hidden_layers=24,
+)
+
 OPT_2_7B_CONFIG = OPTConfig(
     vocab_size=50272,
     hidden_size=2560,
@@ -35,6 +45,36 @@ OPT_2_7B_CONFIG = OPTConfig(
     head_dim=80,
     ffn_dim=10240,
     num_hidden_layers=32,
+)
+
+OPT_6_7B_CONFIG = OPTConfig(
+    vocab_size=50272,
+    hidden_size=4096,
+    max_position_embeddings=2050,
+    num_attention_heads=32,
+    head_dim=128,
+    ffn_dim=16384,
+    num_hidden_layers=32,
+)
+
+OPT_13B_CONFIG = OPTConfig(
+    vocab_size=50272,
+    hidden_size=5120,
+    max_position_embeddings=2050,
+    num_attention_heads=40,
+    head_dim=128,
+    ffn_dim=20480,
+    num_hidden_layers=40,
+)
+
+OPT_30B_CONFIG = OPTConfig(
+    vocab_size=50272,
+    hidden_size=7168,
+    max_position_embeddings=2050,
+    num_attention_heads=56,
+    head_dim=128,
+    ffn_dim=28672,
+    num_hidden_layers=48,
 )
 
 

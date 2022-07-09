@@ -14,7 +14,19 @@ def load_sharded_weights(model, sharded_checkpoint_list):
     config = model.config
     num_shards = len(sharded_checkpoint_list)
     for shard_i in range(num_shards):
-        flat_params = torch.load(sharded_checkpoint_list[shard_i], map_location="cpu")["model"]["flat_param_0"]
+        loaded = torch.load(sharded_checkpoint_list[shard_i], map_location="cpu")
+        if len(loaded["model"]) == 1:
+            # small_model
+            flat_params = loaded["model"]["flat_param_0"]
+            load_final_layer_norm_first = False
+        else:
+            # big model
+            load_final_layer_norm_first = True
+            flat_params = torch.cat([
+                v.flatten()
+                for k, v in loaded["model"].items()
+                if k != "decoder.version"
+            ])
 
         # noinspection PyUnresolvedReferences
         vocab_size_per_shard = config.vocab_size // num_shards
@@ -30,6 +42,13 @@ def load_sharded_weights(model, sharded_checkpoint_list):
         # Pos encoding
         out, flat_params = take_out(flat_params, (config.max_position_embeddings, config.hidden_size))
         model.embed_positions.weight.data[:] = out
+
+        if load_final_layer_norm_first:
+            # Post-attention LayerNorm
+            out, flat_params = take_out(flat_params, (config.hidden_size,))
+            model.final_layernorm.weight.data[:] = out
+            out, flat_params = take_out(flat_params, (config.hidden_size,))
+            model.final_layernorm.bias.data[:] = out
 
         for layer_i in range(config.num_hidden_layers):
 
@@ -93,10 +112,11 @@ def load_sharded_weights(model, sharded_checkpoint_list):
             out, flat_params = take_out(flat_params, (config.hidden_size,))
             model.layer_list[layer_i].post_attention_layernorm.bias.data[:] = out
 
-        # Post-attention LayerNorm
-        out, flat_params = take_out(flat_params, (config.hidden_size,))
-        model.final_layernorm.weight.data[:] = out
-        out, flat_params = take_out(flat_params, (config.hidden_size,))
-        model.final_layernorm.bias.data[:] = out
+        if not load_final_layer_norm_first:
+            # Post-attention LayerNorm
+            out, flat_params = take_out(flat_params, (config.hidden_size,))
+            model.final_layernorm.weight.data[:] = out
+            out, flat_params = take_out(flat_params, (config.hidden_size,))
+            model.final_layernorm.bias.data[:] = out
 
         assert flat_params.numel() == 0
