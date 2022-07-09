@@ -5,9 +5,9 @@ from tqdm import auto as tqdm_lib
 
 def greedy_generate(model: nn.Module, input_ids: torch.Tensor, max_seq_len: int,
                     verbose=True):
-    """Generate greedily from 20B.
+    """Generate greedily from OPT.
 
-    :param model: NeoX20BModel
+    :param model: OPTModel
     :param input_ids: token IDs [batch_size, seq_len]
     :param max_seq_len: max sequence length to generate up to (includes input_ids)
     :param verbose: whether to print progress
@@ -46,7 +46,7 @@ def greedy_generate_text(model: nn.Module,
                          max_seq_len: int,
                          device=torch.device("cuda:0"),
                          verbose=True):
-    """Generate greedily from 20B.
+    """Generate greedily from OPT.
 
     :param model: OPTModel
     :param tokenizer: OPT tokenizer (i.e. GPT-2, non-fast tokenizer)

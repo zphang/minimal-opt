@@ -78,6 +78,28 @@ OPT_30B_CONFIG = OPTConfig(
 )
 
 
+OPT_66B_CONFIG = OPTConfig(
+    vocab_size=50272,
+    hidden_size=9216,
+    max_position_embeddings=2050,
+    num_attention_heads=72,
+    head_dim=128,
+    ffn_dim=36864,
+    num_hidden_layers=64,
+)
+
+
+OPT_175B_CONFIG = OPTConfig(
+    vocab_size=50272,
+    hidden_size=12288,
+    max_position_embeddings=2050,
+    num_attention_heads=96,
+    head_dim=128,
+    ffn_dim=49152,
+    num_hidden_layers=96,
+)
+
+
 class OPTModel(nn.Module):
     def __init__(self, config: OPTConfig, use_cache=False, device=None):
         super().__init__()
@@ -143,6 +165,87 @@ class OPTModel(nn.Module):
         hidden_states = self.post_transformer_transpose(hidden_states)
         hidden_states = self.final_layernorm(hidden_states)
 
+        logits = self.logits_out(hidden_states)
+        if self.use_cache:
+            return logits, kv_cache_list
+        else:
+            return logits
+
+
+class PPOPTModel(OPTModel):
+    def __init__(self, config: OPTConfig, device_list=None, use_cache=False):
+        super(OPTModel, self).__init__()
+
+        self.config = config
+        self.use_cache = use_cache
+        if device_list:
+            self.device_list = device_list
+        else:
+            all_devices = [torch.device(f"cuda:{i}") for i in range(torch.cuda.device_count())]
+            layers_per_device = math.ceil((self.config.num_hidden_layers + 2) / len(all_devices))
+            self.device_list = [
+                device
+                for device in all_devices
+                for _ in range(layers_per_device)
+            ]
+        self.embed_tokens = EmbeddingNoInit(
+            num_embeddings=config.vocab_size,
+            embedding_dim=config.hidden_size,
+            device=self.device_list[0], dtype=torch.float16,
+        )
+        self.embed_positions = LearnedPositionalEmbedding(
+            num_embeddings=config.max_position_embeddings,
+            embedding_dim=config.hidden_size,
+            device=self.device_list[0], dtype=torch.float16,
+        )
+        self.layer_list = nn.ModuleList([])
+        for layer_i in range(config.num_hidden_layers):
+            self.layer_list.append(TransformerLayer(
+                config, use_cache, device=self.device_list[layer_i + 1]))
+        self.final_layernorm = LayerNormNoInit(
+            config.hidden_size,
+            device=self.device_list[config.num_hidden_layers + 1],
+            dtype=torch.float16,
+        )
+        self.logits_out = LinearNoInit(
+            config.hidden_size, config.vocab_size, bias=False,
+            device=self.device_list[0],
+            dtype=torch.float16,
+        )
+
+    def forward(self, input_ids, attention_mask=None, layer_past=None):
+
+        if attention_mask is None:
+            attention_mask = generate_mask(input_ids.shape[1]).to(input_ids.device)
+        if self.use_cache:
+            if layer_past is None:
+                kv_length = input_ids.shape[1]
+            else:
+                kv_length = layer_past[0].shape[1] + 1
+            attention_mask = attention_mask[..., :input_ids.shape[1], :kv_length]
+
+        if layer_past is None:
+            layer_past = [None] * len(self.layer_list)
+        kv_cache_list = []
+        token_embeddings = self.embed_tokens(input_ids)
+        pos_embeddings = self.embed_positions(token_embeddings, kv_cache=layer_past)
+        hidden_states = token_embeddings + pos_embeddings
+        hidden_states = self.pre_transformer_transpose(hidden_states)
+
+        for layer_i, layer in enumerate(self.layer_list):
+            hidden_states = hidden_states.to(self.device_list[layer_i + 1])
+            attention_mask = attention_mask.to(self.device_list[layer_i + 1])
+            hidden_states, kv_cache = layer(
+                hidden_states=hidden_states,
+                attention_mask=attention_mask,
+                layer_past=layer_past[layer_i],
+            )
+            kv_cache_list.append(kv_cache)
+        hidden_states = self.post_transformer_transpose(hidden_states)
+        hidden_states = hidden_states.to(self.device_list[self.config.num_hidden_layers + 1])
+        hidden_states = self.final_layernorm(hidden_states)
+
+        hidden_states = hidden_states.to(self.device_list[0])
         logits = self.logits_out(hidden_states)
         if self.use_cache:
             return logits, kv_cache_list

@@ -15,7 +15,7 @@ def load_sharded_weights(model, sharded_checkpoint_list):
     num_shards = len(sharded_checkpoint_list)
     for shard_i in range(num_shards):
         loaded = torch.load(sharded_checkpoint_list[shard_i], map_location="cpu")
-        if len(loaded["model"]) == 1:
+        if len(loaded["model"]) == 2:
             # small_model
             flat_params = loaded["model"]["flat_param_0"]
             load_final_layer_norm_first = False
